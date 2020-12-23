@@ -1,6 +1,8 @@
 // import 'react-native-gesture-handler';
 import React from 'react';
 
+import loadImages from '@/plugins/images';
+
 import Navigation from '@/navigation/navigation';
 import theme from './theme';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
@@ -21,6 +23,12 @@ export default function App() {
         // store.dispatch(logout()); WHY ??
         store.dispatch(clearState);
     };
+
+    React.useEffect(() => {
+        (async () => {
+            await loadImages();
+        })();
+    }, []);
     return (
         <Provider>
             <AuthProvider
