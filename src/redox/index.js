@@ -1,10 +1,46 @@
 import React from 'react';
 import * as Redux from 'redux';
-import {createSlice, createAsyncThunk} from '@reduxjs/toolkit';
+import {
+    createSlice,
+    createAsyncThunk,
+    createAction,
+    createReducer,
+} from '@reduxjs/toolkit';
 
 import {Provider as ProviderRedux, useDispatch, useSelector} from 'react-redux';
-import defaultStorage from 'redux-persist/lib/storage';
+// import defaultStorage from 'redux-persist/lib/storage';
+import createWebStorage from 'redux-persist/lib/storage/createWebStorage';
 
+const createNoopStorage = () => {
+    return {
+        getItem(_key) {
+            return Promise.resolve(null);
+        },
+        setItem(_key, value) {
+            return Promise.resolve(value);
+        },
+        removeItem(_key) {
+            return Promise.resolve();
+        },
+    };
+};
+
+let defaultStorage = null;
+if (typeof document != 'undefined') {
+    // I'm on the web!
+    defaultStorage = createWebStorage();
+} else if (
+    typeof navigator != 'undefined' &&
+    navigator.product == 'ReactNative'
+) {
+    // I'm in react-native
+    console.warn('/! change the storage for react-native');
+    defaultStorage = createNoopStorage();
+} else {
+    // I'm in node js
+}
+// const defaultStorage =
+//     typeof window === 'undefined' ? createNoopStorage() : createWebStorage();
 const {combineReducers: combineReducersRedux} = Redux;
 
 import {configureStore, getDefaultMiddleware} from '@reduxjs/toolkit';
@@ -25,6 +61,10 @@ import {PersistGate as PersistGateRedux} from 'redux-persist/integration/react';
 import autoMergeLevel2 from 'redux-persist/lib/stateReconciler/autoMergeLevel2';
 
 import * as z from 'zod';
+
+var MODULES = [];
+
+var MODULES_CONFIGURATED = false;
 
 const isFunction = (functionToCheck) => {
     return (
@@ -133,54 +173,76 @@ const processReducer = ({
     prefix,
     defaultCases = {},
     onlyPrefix = false,
+    onlyReducer = false,
 } = {}) => {
+    // console.log(defaultCases);
     const newReducers = Object.entries(reducers).map(([name, reducer]) => {
         const nameReduced = prefix ? `${prefix}/${name}` : name;
         if (onlyPrefix) return {[name]: nameReduced};
-        if (isFunction(reducer)) {
-            return {
-                [`${nameReduced}/fulfilled`]: (arg1, arg2) => {
-                    (defaultCases.fulfilled ?? defaultCases.f ?? fakeFunc)(
-                        arg1,
-                        arg2,
-                    );
-                    return reducer(arg1, arg2);
-                },
-            };
-        } else {
-            return {
-                [`${nameReduced}/fulfilled`]: (arg1, arg2) => {
-                    (defaultCases.fulfilled ?? defaultCases.f ?? fakeFunc)(
-                        arg1,
-                        arg2,
-                    );
-                    return (reducer.fulfilled ?? reducer.f ?? fakeFunc)(
-                        arg1,
-                        arg2,
-                    );
-                },
-                [`${nameReduced}/pending`]: (arg1, arg2) => {
-                    (defaultCases.pending ?? defaultCases.p ?? fakeFunc)(
-                        arg1,
-                        arg2,
-                    );
-                    return (reducer.pending ?? reducer.p ?? fakeFunc)(
-                        arg1,
-                        arg2,
-                    );
-                },
-                [`${nameReduced}/reject`]: (arg1, arg2) => {
-                    (defaultCases.reject ?? defaultCases.r ?? fakeFunc)(
-                        arg1,
-                        arg2,
-                    );
-                    return (reducer.reject ?? reducer.r ?? fakeFunc)(
-                        arg1,
-                        arg2,
-                    );
-                },
-            };
+        if (onlyReducer) {
+            return {[`${nameReduced}`]: reducer};
         }
+        // if (isFunction(reducer)) {
+        //     return {
+        //         [`${nameReduced}/fulfilled`]: (arg1, arg2) => {
+        //             (defaultCases.fulfilled ?? defaultCases.f ?? fakeFunc)(
+        //                 arg1,
+        //                 arg2,
+        //             );
+        //             return reducer(arg1, arg2);
+        //         },
+        //     };
+        // } else {
+        return {
+            [`${nameReduced}/fulfilled`]: (arg1, arg2) => {
+                (defaultCases.fulfilled ?? defaultCases.f ?? fakeFunc)(
+                    arg1,
+                    arg2,
+                );
+                Object.values(MODULES).forEach((module) =>
+                    (module?.cases?.fulfilled ?? module?.cases?.f ?? fakeFunc)(
+                        arg1,
+                        arg2,
+                    ),
+                );
+                return (isFunction(reducer)
+                    ? reducer
+                    : reducer.fulfilled ?? reducer.f ?? fakeFunc)(arg1, arg2);
+            },
+            [`${nameReduced}/pending`]: (arg1, arg2) => {
+                (defaultCases.pending ?? defaultCases.p ?? fakeFunc)(
+                    arg1,
+                    arg2,
+                );
+                Object.values(MODULES).forEach((module) =>
+                    (module?.cases?.pending ?? module?.cases?.p ?? fakeFunc)(
+                        arg1,
+                        arg2,
+                    ),
+                );
+                return (isFunction(reducer)
+                    ? reducer
+                    : reducer.pending ?? reducer.p ?? fakeFunc)(arg1, arg2);
+            },
+            [`${nameReduced}/rejected`]: (arg1, arg2) => {
+                // console.log(defaultCases, defaultCases.reject);
+                (defaultCases.rejected ?? defaultCases.r ?? fakeFunc)(
+                    arg1,
+                    arg2,
+                );
+                Object.values(MODULES).forEach((module) =>
+                    (module?.cases?.rejected ?? module?.cases?.r ?? fakeFunc)(
+                        arg1,
+                        arg2,
+                    ),
+                );
+
+                return (isFunction(reducer)
+                    ? reducer
+                    : reducer.rejected ?? reducer.r ?? fakeFunc)(arg1, arg2);
+            },
+        };
+        // }
     });
     const c = Object.assign({}, ...newReducers);
     console.log(c);
@@ -206,7 +268,7 @@ const getErrorKeys = (err) => Object.keys(err.error.flatten().fieldErrors);
 const recupGoodSliceExtraReducers = (extraReducers) => {
     const testSafe = Slice.safeParse(extraReducers);
     if (testSafe.success) {
-        return Object.keys(testSafe.data);
+        return Object.keys(testSafe?.data ?? {});
     }
     const sliceErrors = getErrorKeys(testSafe);
     const sliceTestWithoutError = without(extraReducers, sliceErrors);
@@ -216,7 +278,7 @@ const recupGoodSliceExtraReducers = (extraReducers) => {
 
     const testSafe2 = Slice.safeParse(sliceTestWithoutError);
     if (testSafe2.success) {
-        return Object.keys(testSafe2.data);
+        return Object.keys(testSafe2?.data ?? {});
     }
     return [];
 };
@@ -228,39 +290,93 @@ const recupGoodSliceExtraReducers = (extraReducers) => {
 //     return slices;
 // };
 
+function getReducers({
+    name,
+    reducers = {},
+    extraReducers,
+    noPrefix = false,
+    defaultCases = {},
+    onlyPrefix = false,
+} = {}) {
+    if (onlyPrefix) {
+        return {
+            extra: processReducer({
+                reducers: Object.assign({}, extraReducers),
+                prefix: noPrefix ? undefined : name,
+                onlyPrefix,
+            }),
+            reducers: processReducer({
+                reducers: Object.assign({}, reducers),
+                prefix: noPrefix ? undefined : name,
+                onlyPrefix,
+            }),
+        };
+        // const finalCaseReducers = {
+        //     ...extraReducers,
+        //     ...sliceCaseReducersByType,
+        // };
+        // const reducer = createReducer(initialState, finalCaseReducers);
+    } else {
+        return {
+            ...processReducer({
+                reducers: extraReducers,
+                prefix: noPrefix ? undefined : name,
+                defaultCases,
+            }),
+            ...processReducer({
+                reducers: reducers,
+                prefix: noPrefix ? undefined : name,
+                onlyReducer: true,
+            }),
+        };
+    }
+}
+
+function createReducerFromReducers({reducers, initialState}) {
+    return createReducer(
+        initialState,
+        // reducers,
+        reducers,
+    );
+}
+
 function createSliceFromExtraReducers({
     name,
     initialState = {},
-    // reducers,
-    extraReducers,
-    noPrefix,
-    defaultCases,
+    reducers = {},
+    extraReducers = {},
+    noPrefix = false,
+    defaultCases = {},
     onlyPrefix = false,
-}) {
-    return !onlyPrefix
-        ? {
-              [name]: createSlice({
-                  name,
-                  initialState,
-                  // reducers,
-                  extraReducers: processReducer({
-                      reducers: extraReducers,
-                      prefix: noPrefix ? undefined : name,
-                      defaultCases,
-                  }),
-              }).reducer,
-          }
-        : processReducer({
-              reducers: extraReducers,
-              prefix: noPrefix ? undefined : name,
-              onlyPrefix,
-          });
+    allReducers,
+} = {}) {
+    const allReducers_ =
+        allReducers ??
+        getReducers({
+            name,
+            reducers,
+            extraReducers,
+            onlyPrefix,
+            defaultCases,
+            noPrefix,
+        });
+    if (onlyPrefix) {
+        return allReducers_;
+    }
+
+    return {
+        [name]: createReducerFromReducers({
+            initialState,
+            // reducers,
+            reducers: allReducers_,
+        }),
+    };
 }
 
 function createSliceFromExtraReducersOrNameSpace({
     name,
     initialState = {},
-    // reducers,
+    reducers,
     extraReducers,
     noPrefix,
     defaultCases,
@@ -268,43 +384,65 @@ function createSliceFromExtraReducersOrNameSpace({
     onlyPrefix = false,
 }) {
     const goodSliceExtraReducers = recupGoodSliceExtraReducers(extraReducers);
-    const plainSliceExtraReducers = createSliceFromExtraReducers({
-        name,
-        initialState,
-        // reducers,
-        extraReducers: filtered(extraReducers, goodSliceExtraReducers),
-        noPrefix,
-        defaultCases,
-        onlyPrefix,
-    });
+    // console.log(defaultCases);
+    const plainSliceExtraReducers =
+        goodSliceExtraReducers.length > 0 || Object.keys(reducers).length > 0
+            ? getReducers({
+                  name,
+                  initialState,
+                  reducers,
+                  extraReducers: filtered(
+                      extraReducers,
+                      goodSliceExtraReducers,
+                  ),
+                  noPrefix,
+                  defaultCases,
+                  onlyPrefix,
+              })
+            : {};
+    // console.log('plain', {...plainSliceExtraReducers});
     const newReducers = without(extraReducers, goodSliceExtraReducers);
-
+    // console.log('new', {...newReducers});
     if (Object.keys(newReducers).length > 0) {
         if (failIfBad) {
             return {};
         }
         const repu = Object.entries(newReducers).map(([k, v]) => {
             const {
-                initialState: initialState2 = {},
+                // initialState: initialState2 = {},
                 noPrefix: noPrefix2 = false,
-                // reducers: reducers2 = {},
+                reducers: reducers2 = {},
                 ...extraReducers2
             } = v;
             return createSliceFromExtraReducersOrNameSpace({
                 name: noPrefix ? k : `${name}/${k}`,
-                initialState: {...initialState, ...initialState2},
+                initialState,
                 noPrefix: noPrefix2,
-                // reducers: reducers2,
+                reducers: reducers2,
                 extraReducers: extraReducers2,
                 defaultCases,
                 failIfBad: true,
                 onlyPrefix,
             });
         });
-        return flatArrayOfObject(plainSliceExtraReducers, repu);
+        // console.log(repu, flatArrayOfObject(plainSliceExtraReducers, repu));
+        const allReducers = createSliceFromExtraReducers({
+            allReducers: flatArrayOfObject(plainSliceExtraReducers, repu),
+            initialState,
+            name,
+            onlyPrefix,
+        });
+        return allReducers;
     }
     // console.log(plainSliceExtraReducers);
-    return plainSliceExtraReducers;
+    return failIfBad
+        ? plainSliceExtraReducers
+        : createSliceFromExtraReducers({
+              initialState,
+              allReducers: plainSliceExtraReducers,
+              name,
+              onlyPrefix,
+          });
 }
 
 const SlicesType = z.object({slices: Slice}).partial();
@@ -356,9 +494,18 @@ function getSlicesFromExtraReducers({
     delete extraReducers.reducers;
     delete extraReducers.selectors;
 
+    const modulesInitialState = Object.values(MODULES)
+        .map((module) => module?.state ?? {})
+        .reduce((state1, state2) => ({...state1, ...state2}), {});
+
+    const modulesDefaultCases = {};
+
+    // console.log(modulesDefaultCases);
+
     return createSliceFromExtraReducersOrNameSpace({
         name,
         initialState: {
+            ...modulesInitialState,
             ...defaultInitialState,
             ...initialState,
             ...reducerInitialState,
@@ -366,29 +513,62 @@ function getSlicesFromExtraReducers({
         reducers: reducersRTK,
         extraReducers,
         noPrefix,
-        defaultCases,
+        defaultCases: {
+            ...defaultCases,
+            ...modulesDefaultCases,
+        },
         onlyPrefix,
     });
 }
-export const INITIAL_STATE = {
-    status: 'idle',
-    error: null,
-};
 
-export const DEFAULT_CASES = {
-    pending: (state) => {
-        // pending or p
-        state.status = 'loading';
+export const prf = {
+    config: {
+        persist: {
+            blacklist: ['status', 'error'],
+        },
     },
-    reject: (state, action) => {
-        // reject or r
-        state.status = 'failed';
-        state.error = action.error.message;
+    state: {
+        status: 'idle',
+        error: null,
     },
-    fulfilled: (state) => {
-        //fulfilled or f
-        state.status = 'succeeded';
+    cases: {
+        pending: (state) => {
+            // pending or p
+            state.status = 'loading';
+            // state.error = null;
+        },
+        rejected: (state, action) => {
+            // reject or r
+            // console.log('here');
+            state.status = 'failed';
+            state.error = action.error.message;
+        },
+        fulfilled: (state) => {
+            //fulfilled or f
+            state.status = 'succeeded';
+        },
     },
+    selectors: {
+        getError: (state, selectors) =>
+            (selectors?.getStatus(state) === 'failed' && state?.error) || '',
+        getStatus: (state) => state?.status,
+        isStatusFinish: (state, selectors) =>
+            ['rejected', 'succeeded'].includes(selectors.getStatus(state)),
+    },
+}; // pending, reject, fulfilled
+
+export const INITIAL_STATE = {};
+
+export const DEFAULT_CASES = {};
+
+export const DEFAULT_SELECTORS = {};
+
+const configure = ({modules = {prf}} = {}) => {
+    if (MODULES_CONFIGURATED) return;
+    Object.entries(modules).forEach(([module_name, module]) => {
+        MODULES[module_name] = module;
+    });
+    MODULES_CONFIGURATED = true;
 };
 
 const getSlicesType = z
@@ -417,6 +597,8 @@ function getSlices({
     const newSlices = Object.entries(slices).map(([name, extraReducers_]) => {
         const extraReducers = getSlicesObj({slice: extraReducers_});
 
+        // console.log(extraReducers);
+
         return getSlicesFromExtraReducers({
             extraReducers,
             defaultCases,
@@ -441,10 +623,76 @@ function flatArrayOfObject(arrayOfObject, ...objects) {
     );
     return r;
 }
-
-function combineReducersFromSlicesReducers({slices, reducers}) {
+const createPersistConfig = ({
+    key = 'root',
+    storage = defaultStorage,
+    whitelist = [],
+    blacklist = [],
+    stateReconciler = autoMergeLevel2,
+    ...persistConfigOpts
+}) => {
+    return {
+        key,
+        storage,
+        whitelist: whitelist.length === 0 ? undefined : whitelist,
+        blacklist: blacklist.length === 0 ? undefined : blacklist,
+        stateReconciler,
+        ...persistConfigOpts,
+    };
+};
+function combineReducersFromSlicesReducers({slices, reducers, persistConfig}) {
+    const gg1 = flatArrayOfObject({}, slices);
     const gg = flatArrayOfObject(slices, reducers);
-    // console.log(gg);
+    // console.log(gg1, gg);
+    if (persistConfig) {
+        const persistConfigModules = Object.values(MODULES)
+            .map((module) => module?.config?.persist ?? {})
+            .reduce((a, b) => ({...a, ...b}), {}); // TODO: revoir ça
+
+        // console.log(
+        //     flatArrayOfObject(
+        //         {},
+        //         Object.entries(gg).map(([gg_name, g]) => ({
+        //             [gg_name]: persistReducer(
+        //                 createPersistConfig({
+        //                     key: gg_name,
+        //                     ...persistConfig,
+        //                     ...persistConfigModules,
+        //                 }),
+        //                 g,
+        //             ),
+        //         })),
+        //     ),
+        // );
+
+        return combineReducersRedux(
+            flatArrayOfObject(
+                flatArrayOfObject(
+                    {},
+                    Object.entries(gg1).map(([gg_name, g]) => {
+                        // console.log(
+                        //     createPersistConfig({
+                        //         key: gg_name,
+                        //         ...persistConfig,
+                        //         ...persistConfigModules,
+                        //     }),
+                        // );
+                        return {
+                            [gg_name]: persistReducer(
+                                createPersistConfig({
+                                    key: gg_name,
+                                    ...persistConfig,
+                                    ...persistConfigModules,
+                                }),
+                                g,
+                            ),
+                        };
+                    }),
+                ),
+                reducers,
+            ),
+        );
+    }
     return combineReducersRedux(gg);
 }
 
@@ -461,6 +709,7 @@ function combineReducers({
     initialState = {},
     slices = {},
     reducers = {},
+    persistConfig,
 }) {
     const newSlices = getSlices({
         defaultCases,
@@ -471,6 +720,7 @@ function combineReducers({
     return combineReducersFromSlicesReducers({
         slices: newSlices,
         reducers,
+        persistConfig,
     });
 }
 
@@ -491,6 +741,7 @@ reducers: [k: string] : func
 function combineReducersListOrObject({
     slices: slices_ = {},
     reducers = {},
+    persistConfig,
     ...props
 } = {}) {
     const {clearStateActionType = 'redox/resetState'} = props;
@@ -501,8 +752,8 @@ function combineReducersListOrObject({
     }
     const getProps = (slices) => {
         const {
-            defaultCases = {},
-            defaultInitialState = {},
+            defaultCases,
+            defaultInitialState,
             initialState = {},
             // reducers: innerReducers = {},
             ...innerSlices
@@ -517,6 +768,7 @@ function combineReducersListOrObject({
         };
     };
     let reducer = {};
+    let sliceKeys = [];
     if (isObject(slices_)) {
         const {
             defaultCases,
@@ -525,12 +777,14 @@ function combineReducersListOrObject({
             // reducers,
             slices,
         } = getProps(slices_);
+        sliceKeys = Object.keys(slices);
         reducer = combineReducers({
             slices,
             defaultCases,
             defaultInitialState,
             initialState,
             reducers,
+            persistConfig,
         });
     } else {
         if (Array.isArray(slices_)) {
@@ -559,9 +813,11 @@ function combineReducersListOrObject({
             //     }) ?? [];
             const allSlicesFlat = flatArrayOfObject({}, allSlices);
             const allInnerReducersFlat = reducers; // flatArrayOfObject(allInnerReducers);
+            sliceKeys = Object.keys(allSlicesFlat);
             reducer = combineReducersFromSlicesReducers({
                 slices: allSlicesFlat,
                 reducers: allInnerReducersFlat,
+                persistConfig,
             });
         }
     }
@@ -575,23 +831,48 @@ function combineReducersListOrObject({
     return {
         reducer: reducerWithResetState,
         clearState: {type: clearStateActionType},
+        sliceKeys,
     };
 }
 
-export const createSelectors = (slice) => {
+export const createSelectors = (
+    slice,
+    name,
+    defaultSelectors = DEFAULT_SELECTORS,
+) => {
     const sliceObj = getSlicesObj({slice});
     const {selectors = {}} = sliceObj;
+    const modulesDefaultSelectors = Object.values(MODULES)
+        .map((module) => module?.selectors ?? {})
+        .reduce((state1, state2) => ({...state1, ...state2}), {});
     return flatArrayOfObject(
         // TODO: REWORK selectors send to function
         {},
-        Object.entries(selectors).map(([k, v]) => {
+        Object.entries({
+            ...modulesDefaultSelectors,
+            ...defaultSelectors,
+            ...selectors,
+        }).map(([k, v]) => {
             if (isFunction(v)) {
-                return {[k]: (state) => v(state, selectors)};
+                return {
+                    [k]: () =>
+                        useSelector((state) =>
+                            v(
+                                state[name],
+                                {
+                                    ...modulesDefaultSelectors,
+                                    ...defaultSelectors,
+                                    ...selectors,
+                                },
+                                {state, name},
+                            ),
+                        ),
+                };
             }
             if (isString(v)) {
                 return {
                     [k]: (state) => {
-                        return getByPath(state, v, undefined);
+                        return getByPath(state[name], v, undefined);
                     },
                 };
             }
@@ -605,29 +886,47 @@ export const createSelectors = (slice) => {
 */
 const createActions = ({actions = {}, slice} = {}) => {
     // const prefix_ = slice?.prefix ?? slice?.name ?? prefix ?? '';
-    const kkk = flatArrayOfObject(
-        {},
-        getSlices({slices: {[slice.name]: slice}, onlyPrefix: true}),
-    );
 
-    // console.log(kkk);
+    const {extra, reducers} = getSlices({
+        slices: {[slice.name]: slice},
+        onlyPrefix: true,
+    })[0];
+    const kkk = flatArrayOfObject({}, extra);
+    const kkk2 = flatArrayOfObject({}, reducers);
+
+    // console.log(kkk, kkk2);
 
     // const noPrefix = slice.noPrefix ?? prefix_ === ''; // ?? false
     const newActions = {};
     Object.entries(actions).forEach(([actionName_, action]) => {
         const newAction = isFunction(action) ? action : action[actionName_];
         const actionName = isFunction(action) ? actionName_ : action.name;
-        newActions[actionName_] = createAsyncThunk(kkk[actionName], newAction);
+        const getSliceState = (getState) => () => getState()[slice.name];
+        newActions[actionName_] = createAsyncThunk(
+            kkk[actionName],
+            (payloadCreator, thunkApi) =>
+                newAction(payloadCreator, thunkApi, {
+                    getSliceState: getSliceState(thunkApi.getState),
+                    selectors: slice?.selectors ?? {},
+                }),
+        );
     });
+
+    Object.entries(kkk2).forEach(([actionName_, action]) => {
+        newActions[actionName_] = createAction(action);
+    });
+
+    // createAction(type)
     return newActions;
 };
 
 export const createActionsSelectors = ({actions = {}, slice} = {}) => {
     return {
         actions: createActions({actions, slice}),
-        selectors: createSelectors(slice),
+        selectors: createSelectors(slice, slice.name),
     };
 };
+
 /*
 slices: {Slice} => if one group of slices, [{Slice}] if multiple
     Slice:
@@ -635,8 +934,8 @@ slices: {Slice} => if one group of slices, [{Slice}] if multiple
 
 */
 function createStorePersist({
-    slices,
-    reducers,
+    slices = {},
+    reducers = {},
     //
     configureStoreOpts = {},
     combineReducersOpts = {},
@@ -651,20 +950,21 @@ function createStorePersist({
     persistStoreOpts = [],
     loading = null,
 }) {
-    const {reducer, clearState} = combineReducersListOrObject({
+    const {reducer, clearState, sliceKeys} = combineReducersListOrObject({
         slices,
         reducers,
+        persistConfig: {storage, stateReconciler},
         ...combineReducersOpts,
     });
-    const persistConfig = {
+    const persistConfig = createPersistConfig({
         key,
         storage,
-        whitelist: whitelist.length === 0 ? undefined : whitelist,
-        blacklist: blacklist.length === 0 ? undefined : blacklist,
+        whitelist,
+        blacklist: [...blacklist, ...sliceKeys], // TODO: warning when custom slice name
         stateReconciler,
         ...persistConfigOpts,
-    };
-
+    });
+    // console.log(persistConfig);
     const persistedReducer = persistReducer(persistConfig, reducer);
 
     const store = configureStore({
@@ -777,4 +1077,7 @@ const createStore = ({
     return storeObj;
 };
 
-export {createStore, useDispatch, useSelector, createActions};
+configure();
+MODULES_CONFIGURATED = false;
+console.log('loaded', MODULES_CONFIGURATED);
+export {createStore, useDispatch, useSelector, createActions, configure};
