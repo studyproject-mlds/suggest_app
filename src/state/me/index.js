@@ -9,8 +9,8 @@ import {me} from './slice';
 // export const selectors = createSelectors(me);
 
 const {actions: createdActions, selectors} = createActionsSelectors({
-    actions,
-    slice: me,
+	actions,
+	slice: me,
 });
 
-export {createdActions as actions, selectors};
+export {createdActions as actions, selectors, me};
