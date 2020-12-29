@@ -23,7 +23,20 @@ export const width = createRestyleFunction({
             : value,
     themeKey: 'width',
 });
+
+export const fSize = createRestyleFunction({
+    property: 'fSize',
+    styleProperty: 'fontSize',
+    transform: ({value, theme, themeKey}) =>
+        value
+            ? Object.keys(theme[themeKey]).includes(value)
+                ? theme[themeKey][value]
+                : value
+            : value,
+    themeKey: 'fontSizes',
+});
 const palette = {
+    transparent: 'transparent',
     purpleLight: '#8C6FF7',
     purplePrimary: '#5A31F4',
     purpleDark: '#3F22AB',
@@ -42,9 +55,16 @@ const palette = {
     red: 'red',
 };
 
+const colorsExplore = {
+    description: 'rgba(0, 0, 0, 0.89)',
+    subtitle: '#868686',
+};
+
 const theme = {
     colors: {
         ...palette,
+        ...colorsExplore,
+        mainGray: '#292520',
         mainBackground: palette.white,
         cardPrimaryBackground: palette.purplePrimary,
     },
@@ -57,14 +77,18 @@ const theme = {
         xl: 50,
         xxl: 100,
         xxxl: 125,
+        tab: 35,
+        buttonClick: 40,
     },
     spacing: {
+        xs: 5,
         s: 8,
         m: 16,
         l: 24,
         xl: 40,
         xxl: 80,
         xxxl: 100,
+        tab: 35,
     },
     fontSizes: {
         small: 12,
@@ -111,6 +135,19 @@ theme.textVariants = {
         textAlign: 'center',
     },
 };
+
+theme.imageVariants = {
+    tab: {
+        width: theme.height.tab,
+        height: theme.height.tab,
+        resizeMode: 'contain',
+    },
+    buttonClick: {
+        width: theme.height.buttonClick,
+        height: theme.height.buttonClick,
+        resizeMode: 'contain',
+    },
+};
 theme.buttonVariants = {
     Social: {justifyContent: 'space-around', height: theme.height.xl},
     world: {
@@ -130,6 +167,11 @@ theme.buttonVariants = {
         alignItems: 'center',
         textAlign: 'center',
         backgroundColor: 'white',
+    },
+    buttonClick: {
+        borderRadius: theme.height.buttonClick,
+        padding: 'm',
+        backgroundColor: 'mainGray',
     },
 };
 export {theme};
