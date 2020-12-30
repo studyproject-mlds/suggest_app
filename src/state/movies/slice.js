@@ -35,31 +35,21 @@ export const movies = () => ({
             // },
         },
     },
-    selectors: {
+    getters: {
         getMovies: ({state}) => state?.data ?? {},
-        getMovie: ({selectors, args}) => selectors.getMovie()?.[args?.id],
+        getMovie: ({state, getters, args}) =>
+            getters.getMovies({state})?.[args?.id],
     },
-    // getter : {
-    //     getDefaultWorld(me){
-
-    //     }
-    // },
+    selectors: {},
     reducers: {
         // eslint-disable-next-line no-shadow
         setMovies(state, {payload: {movies}}) {
-            // console.log('setMovies ');
             movies.forEach((movie) => {
                 if (movie.id in state.data) return;
-                state.data[movie.id] = [...movie];
+                state.data[movie.id] = {...movie};
             });
         },
     },
-    // [getMe.name]: (state, {payload}) => {
-    //     state.data = payload?.[0] ?? {};
-    // },
-    // [setDefaultWorld.name]: (state, {payload}) => {
-    //     state.data.default_world_name = payload;
-    // },
 });
 
 //TODO: thincking about accessor (get)
