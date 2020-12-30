@@ -1,9 +1,10 @@
-import {getMe, setDefaultWorld} from './actions';
+import {getMe, setDefaultWorld, getSuggestions, setSuggestion} from './actions';
 
 export const me = () => ({
     initialState: {
         data: {
             default_world_name: null,
+            suggestions_id: {},
         },
     },
     selectors: {
@@ -12,16 +13,21 @@ export const me = () => ({
         getDefaultWorld: (state, selectors) =>
             selectors.getMe(state)?.default_world_name ?? null,
     },
-    // getter : {
-    //     getDefaultWorld(me){
-
-    //     }
-    // },
     [getMe.name]: (state, {payload}) => {
-        state.data = payload?.[0] ?? {};
+        state.data = {...state.data, ...(payload?.[0] ?? {})};
     },
     [setDefaultWorld.name]: (state, {payload}) => {
         state.data.default_world_name = payload;
+    },
+    [getSuggestions.name]: (
+        state,
+        {payload: {suggestions_id, world} = {suggestions_id}},
+    ) => {
+        // console.log('idi', suggestions_id);
+        state.data.suggestions_id[world] = [...(suggestions_id ?? [])];
+    },
+    [setSuggestion.name]: (state, {payload}) => {
+        console.log('setSuggestion ok');
     },
 });
 
