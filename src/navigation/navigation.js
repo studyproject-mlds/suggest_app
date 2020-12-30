@@ -3,6 +3,7 @@ import React from 'react';
 import {NavigationContainer} from '@react-navigation/native';
 
 import Home from '@/screens/Home';
+import Text from '@/components/Text';
 
 import DefaultWorld from '@/screens/DefaultWorld';
 
@@ -12,13 +13,17 @@ import {createStackNavigator} from '@react-navigation/stack';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 
 // import {EventRegister} from 'react-native-event-listeners';
-import {Image} from 'react-native';
+import {StyleSheet} from 'react-native';
+
+import {theme} from '@/theme';
 
 import {useApp} from '@/hooks';
 
 import {actions as meActions, selectors as MeSelectors} from '@/state/me';
 
-import {SafeAreaView} from 'react-native-safe-area-context';
+import SafeAreaView from 'react-native-safe-area-view';
+import {SafeAreaProvider} from 'react-native-safe-area-context';
+
 import {StatusBar} from 'react-native';
 
 import Box from '@/components/Box';
@@ -29,105 +34,149 @@ import {useNavigation} from '@react-navigation/native';
 import FastImage from 'react-native-fast-image';
 // import Text from '@/components/Text';
 
-const DefaultView = ({}) => <Box flex={1} backgroundColor="black" />;
+export const styleFull = {
+    ...StyleSheet.absoluteFillObject,
+    display: 'flex',
+    height: '100%',
+    width: '100%',
+};
+
+const DefaultView = ({}) => (
+    <Box
+        {...styleFull}
+        backgroundColor="black"
+        justifyContent="center"
+        zIndex={10000000000000}
+        alignItems="center">
+        <Text color="white">Suggest</Text>
+    </Box>
+);
 
 const Stack = createStackNavigator();
 
 const Tab = createBottomTabNavigator();
 
-const HomeStack = ({world, ...props}) => (
-    <Tab.Navigator
-        tabBarOptions={{
-            // activeTintColor: '#e91e63',
-            showLabel: false,
-            style: {
-                borderTopColor: '#292520',
-                height: 50,
-                backgroundColor: '#292520',
-            },
-            tabStyle: {
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                height: 50,
-            },
-        }}>
-        <Tab.Screen
-            name="Home"
-            options={{
-                tabBarIcon: ({color, size}) => {
-                    return (
-                        <FastImage
-                            source={images.swipeIcon}
-                            style={{width: 35, height: 35}}
-                            resizeMode={'contain'}
-                        />
-                    );
-                },
-            }}>
-            {(navProps) => <Home {...props} {...navProps} />}
-        </Tab.Screen>
-        {/*listIcon*/}
-        <Tab.Screen
-            name="Search"
-            component={Home}
-            options={{
-                tabBarIcon: ({color, size}) => {
-                    return (
-                        <FastImage
-                            source={images.searchIcon}
-                            style={{width: 35, height: 35}}
-                            resizeMode={'contain'}
-                        />
-                    );
-                },
-            }}
-        />
-        <Tab.Screen
-            name="list"
-            component={Home}
-            options={{
-                tabBarIcon: ({color, size}) => {
-                    return (
-                        <FastImage
-                            source={images.listIcon}
-                            style={{width: 35, height: 35}}
-                            resizeMode={'contain'}
-                        />
-                    );
-                },
-            }}
-        />
-        <Tab.Screen
-            name="world"
-            component={DefaultView}
-            options={{
-                tabBarIcon: ({tintColor}) => (
-                    <FastImage
-                        source={
-                            world === 'movie'
-                                ? images.movieEmoji
-                                : world === 'series'
-                                ? images.seriesEmoji
-                                : images.movieEmoji
-                        }
-                        style={{width: 35, height: 35}}
-                        resizeMode={'contain'}
-                    />
-                ),
-            }}
-            listeners={({navigation, route}) => ({
-                tabPress: (e) => {
-                    // Prevent default action
-                    e.preventDefault();
+const HomeStack = ({world, ...props}) => {
+    const [show, setShow] = React.useState(false);
+    const [count, setCount] = React.useState(0);
 
-                    // Do something with the `navigation` object
-                    navigation.navigate('DefaultWorld');
-                },
-            })}
-        />
-    </Tab.Navigator>
-);
+    const onLayout = () => {
+        setCount((i) => i + 1);
+        if (count === 2) {
+            setShow(true);
+        }
+    };
+
+    return (
+        <React.Fragment>
+            {!show && <DefaultView />}
+            <Box style={{...styleFull}}>
+                <SafeAreaView
+                    style={[styles.SafeAreaViewUp]}
+                    onLayout={onLayout}
+                />
+                <SafeAreaView
+                    style={[styles.SafeAreaViewDown]}
+                    onLayout={onLayout}>
+                    {show && (
+                        <Tab.Navigator
+                            tabBarOptions={{
+                                // activeTintColor: '#e91e63',
+                                showLabel: false,
+                                style: {
+                                    borderTopColor: theme.colors.mainGray,
+                                    height: theme.height.xl,
+                                    backgroundColor: theme.colors.mainGray,
+                                },
+                                tabStyle: {
+                                    display: 'flex',
+                                    justifyContent: 'center',
+                                    alignItems: 'center',
+                                    height: theme.height.xl,
+                                },
+                            }}>
+                            <Tab.Screen
+                                name="Home"
+                                options={{
+                                    tabBarIcon: ({color, size}) => {
+                                        return (
+                                            <FastImage
+                                                source={images.swipeIcon}
+                                                style={styles.tab}
+                                            />
+                                        );
+                                    },
+                                }}>
+                                {(navProps) => (
+                                    <Home {...props} {...navProps} />
+                                )}
+                            </Tab.Screen>
+                            {/*listIcon*/}
+                            <Tab.Screen
+                                name="Search"
+                                component={Home}
+                                options={{
+                                    tabBarIcon: ({color, size}) => {
+                                        return (
+                                            <FastImage
+                                                source={images.searchIcon}
+                                                style={styles.tab}
+                                                resizeMode={'contain'}
+                                            />
+                                        );
+                                    },
+                                }}
+                            />
+                            <Tab.Screen
+                                name="list"
+                                component={Home}
+                                options={{
+                                    tabBarIcon: ({color, size}) => {
+                                        return (
+                                            <FastImage
+                                                source={images.listIcon}
+                                                style={styles.tab}
+                                                resizeMode={'contain'}
+                                            />
+                                        );
+                                    },
+                                }}
+                            />
+                            <Tab.Screen
+                                name="world"
+                                component={DefaultView}
+                                options={{
+                                    tabBarIcon: ({tintColor}) => (
+                                        <FastImage
+                                            source={
+                                                world === 'movie'
+                                                    ? images.movieEmoji
+                                                    : world === 'series'
+                                                    ? images.seriesEmoji
+                                                    : images.movieEmoji
+                                            }
+                                            style={styles.tab}
+                                            resizeMode={'contain'}
+                                        />
+                                    ),
+                                }}
+                                listeners={({navigation, route}) => ({
+                                    tabPress: (e) => {
+                                        // Prevent default action
+                                        e.preventDefault();
+
+                                        // Do something with the `navigation` object
+                                        navigation.navigate('DefaultWorld');
+                                    },
+                                })}
+                            />
+                        </Tab.Navigator>
+                    )}
+                </SafeAreaView>
+            </Box>
+        </React.Fragment>
+    );
+};
 
 const AuthenticatedStack = ({}) => {
     const {
@@ -136,7 +185,6 @@ const AuthenticatedStack = ({}) => {
     } = useApp();
     const {navigate} = useNavigation();
 
-    const me = MeSelectors.getMe();
     const defaultWorld = MeSelectors.getDefaultWorld();
     const isStatusFinish = MeSelectors.isStatusFinish();
 
@@ -149,18 +197,15 @@ const AuthenticatedStack = ({}) => {
         const a = isStatusFinish
             ? (defaultWorld && 'Home') ?? 'DefaultWorld'
             : 'default';
-        console.log('dddd', isStatusFinish, defaultWorld);
 
         if (a !== 'default') {
-            console.log('ddzd', a);
             navigate(a);
         }
-    }, [me, defaultWorld]);
-    // console.log(
-    //     isStatusFinish ? (defaultWorld && 'Home') ?? 'DefaultWorld' : 'default',
-    // );
+    }, [defaultWorld, isStatusFinish, navigate]);
+
     return (
         <Stack.Navigator
+            options={{animationEnabled: false}}
             initialRouteName={'default'}
             screenOptions={{
                 headerShown: false,
@@ -200,37 +245,45 @@ export default function Navigation() {
     const {
         auth: {isAuthenticated, isLoading},
     } = useApp();
-    console.log(isLoading, isAuthenticated);
+    //  <SafeAreaView style={{flex: 0, backgroundColor: 'black'}} />
     return (
-        <SafeAreaView style={styles.SafeAreaView}>
-            <StatusBar barStyle="dark-content" backgroundColor="dark" />
-            <NavigationContainer>
-                <Stack.Navigator
-                    mode="modal"
-                    screenOptions={{
-                        headerShown: false,
-                    }}>
-                    {!isLoading && isAuthenticated && (
-                        <Stack.Screen
-                            name="AuthenticatedStack"
-                            component={AuthenticatedStack}
-                        />
-                    )}
-                    {!isLoading && !isAuthenticated && (
-                        <Stack.Screen
-                            name="LoginStack"
-                            component={LoginStack}
-                        />
-                    )}
-                    {isLoading && (
-                        <Stack.Screen name="default" component={DefaultView} />
-                    )}
-                </Stack.Navigator>
-            </NavigationContainer>
-        </SafeAreaView>
+        <>
+            <SafeAreaProvider>
+                <StatusBar barStyle="light-content" />
+                <NavigationContainer>
+                    <Stack.Navigator
+                        mode="modal"
+                        screenOptions={{
+                            headerShown: false,
+                        }}>
+                        {!isLoading && isAuthenticated && (
+                            <Stack.Screen
+                                options={{animationEnabled: false}}
+                                name="AuthenticatedStack"
+                                component={AuthenticatedStack}
+                            />
+                        )}
+                        {!isLoading && !isAuthenticated && (
+                            <Stack.Screen
+                                name="LoginStack"
+                                component={LoginStack}
+                            />
+                        )}
+                        {isLoading && (
+                            <Stack.Screen
+                                name="default"
+                                component={DefaultView}
+                            />
+                        )}
+                    </Stack.Navigator>
+                </NavigationContainer>
+            </SafeAreaProvider>
+        </>
     );
 }
 
 const styles = {
-    SafeAreaView: {flex: 1, backgroundColor: 'black'},
+    SafeAreaViewUp: {flex: 0, backgroundColor: 'black'},
+    SafeAreaViewDown: {flex: 1, backgroundColor: theme.colors.mainGray},
+    tab: {...theme.imageVariants.tab},
 };
