@@ -6,11 +6,12 @@ export const genres = () => ({
             genres: {},
         },
     },
-    selectors: {
+    getters: {
         getGenres: ({state}) => state?.data?.genres ?? {},
-        getGenre: ({state, selectors, args}) =>
-            selectors.getGenres({state})?.[args?.id],
+        getGenre: ({state, getters, args}) =>
+            getters.getGenres({state})?.[args?.id],
     },
+    selectors: {},
     [getGenres.name]: (state, {payload}) => {
         console.log('payload', payload);
         payload?.forEach((genre) => {
