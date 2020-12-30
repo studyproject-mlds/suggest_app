@@ -36,7 +36,7 @@ export default function App() {
                 clientId={config.clientId}
                 clientSecret={config.clientSecret}
                 baseUrlAuth={config.baseUrlAuth}
-                textAlertBeforeExpiredLogout="blabla">
+                textAlertBeforeExpiredLogout="Session Expiré, Veuillez vous reconnecter.">
                 <ThemeProvider theme={theme}>
                     <SafeAreaProvider>
                         <Navigation />
