@@ -8,6 +8,8 @@ import {auth_reducer, auth_reducer_name} from '@/auth';
 
 import {me} from './me';
 import {world} from './world';
+import {movies} from './movies';
+import {genres} from './genres';
 
 const {Provider, store, clearState} = createStore({
     slices: [
@@ -17,6 +19,8 @@ const {Provider, store, clearState} = createStore({
             },
             me,
             world,
+            movies,
+            genres,
         },
     ],
     persist: {storage: AsyncStorage},
