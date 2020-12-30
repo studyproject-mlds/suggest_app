@@ -1,5 +1,8 @@
-import { createText } from '@shopify/restyle';
+import {textRestyleFunctions, createRestyleComponent} from '@shopify/restyle';
+import {fSize} from '@/theme';
+import {Text as TextTN} from 'react-native';
 
-const Text = createText();
+
+const Text = createRestyleComponent([...textRestyleFunctions, fSize], TextTN);
 
 export default Text;
