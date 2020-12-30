@@ -8,9 +8,9 @@ import {me} from './slice';
 
 // export const selectors = createSelectors(me);
 
-const {actions: createdActions, selectors} = createActionsSelectors({
+const {actions: createdActions, selectors, getters} = createActionsSelectors({
 	actions,
 	slice: me,
 });
 
-export {createdActions as actions, selectors, me};
+export {createdActions as actions, selectors, me, getters};

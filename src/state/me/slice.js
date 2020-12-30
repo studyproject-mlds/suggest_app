@@ -1,4 +1,5 @@
 import {getMe, setDefaultWorld, getSuggestions, setSuggestion} from './actions';
+import {getters as movieGetters} from '@/state/movies';
 
 export const me = () => ({
     initialState: {
@@ -7,11 +8,23 @@ export const me = () => ({
             suggestions_id: {},
         },
     },
+    getters: {
+        getMe: ({state}) => {
+            return state?.data ?? {};
+        },
+        getDefaultWorld: ({state, getters}) => {
+            return getters.getMe({state})?.default_world_name;
+        },
+        getSuggestionsId: ({state, getters, args}) =>
+            getters.getMe({state})?.suggestions_id?.[args?.world] ?? null,
+    },
     selectors: {
-        //     // getMe: 'me.data.me[0]', // prevent undefined path -> permit to choice default value here
-        getMe: (state) => state?.data ?? {},
-        getDefaultWorld: (state, selectors) =>
-            selectors.getMe(state)?.default_world_name ?? null,
+        getSuggestions: ({getters, args}) => {
+            if (args?.world !== 'movie') return;
+            return (getters?.getSuggestionsId(args) ?? []).map((id) =>
+                movieGetters.getMovie({id}),
+            );
+        },
     },
     [getMe.name]: (state, {payload}) => {
         state.data = {...state.data, ...(payload?.[0] ?? {})};
