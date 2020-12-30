@@ -6,8 +6,6 @@ import {useTranslation} from 'react-i18next';
 import Text from '@/components/Text';
 import {Button} from '@/components/Button';
 
-import {Image} from 'react-native';
-
 import FastImage from 'react-native-fast-image';
 
 import {images} from '@/plugins/images';
@@ -16,10 +14,7 @@ import {theme} from '@/theme';
 
 import {useApp} from '@/hooks';
 
-import {
-    actions as worldActions,
-    selectors as worldSelectors,
-} from '@/state/world';
+import {actions as worldActions} from '@/state/world';
 
 import {actions as meActions, selectors as meSelectors} from '@/state/me';
 
@@ -43,25 +38,22 @@ const DefaultWorld = () => {
 
     const {
         api: {execute, dispatch},
-        redux: {useSelector},
     } = useApp();
 
-    const defaultWorld = worldSelectors.getDefaultWorldInProgress();
     const error = meSelectors.getError();
 
     const onPress = (world) => async () => {
         await execute(worldActions.setDefaultWorldInProgress, {world});
-        // TODO: Change in futur
+        // TODO: Change in futur - add world initialization
         await dispatch(meActions.setDefaultWorld, {world});
     };
-    // console.log(defaultWorld, error);
 
     return (
         <Box
             backgroundColor="dark"
             flex={1}
             justifyContent="space-between"
-            py={'m'}>
+            py={'xxxl'}>
             <Text variant="text" color="white" textAlign="center">
                 {t('default_world.title', 'Veuillez séléctionner un thème')}
             </Text>
