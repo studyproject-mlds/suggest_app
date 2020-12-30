@@ -1,3 +1,4 @@
+import {actions as moviesActions} from '@/state/movies';
 export const getMe = async ({api}) => {
     const res = await api.get('me/');
 
@@ -21,4 +22,28 @@ export const setDefaultWorld = async ({api, world}) => {
         throw err;
     }
     return world;
+};
+
+export const getSuggestions = async ({api, world}, {dispatch}) => {
+    const suggestions = (
+        await api.get('me/get_suggestions/', {params: {world}})
+    ).data;
+    // console.log(suggestions);
+    await dispatch(moviesActions.setMovies({movies: suggestions}));
+
+    return {
+        suggestions_id: suggestions.map((suggestion) => suggestion.id),
+        world,
+    };
+};
+
+export const setSuggestion = async (
+    {api, world, id, action, rate},
+    {rejectWithValue},
+) => {
+    if (!['IGNORED', 'ADDED', 'RATED'].includes(action))
+        rejectWithValue({message: `${action} not authorized`});
+    if (action === 'RATED' && !rate)
+        rejectWithValue({message: "action 'RATED' with no rate"});
+    await api.post('me/set_suggestions_action/', {world, action, id, rate});
 };
