@@ -7,9 +7,72 @@ import {
     createReducer,
 } from '@reduxjs/toolkit';
 
-import {Provider as ProviderRedux, useDispatch, useSelector} from 'react-redux';
+import {
+    Provider as ProviderRedux,
+    useDispatch,
+    useSelector as useSelectorRedux,
+} from 'react-redux';
 // import defaultStorage from 'redux-persist/lib/storage';
 import createWebStorage from 'redux-persist/lib/storage/createWebStorage';
+
+import {createSelector, createObserver} from './recompute';
+import {setState} from './recompute';
+import {parse} from 'pathington';
+
+import {useRef, useEffect} from 'react';
+// import {useSelector as useSelectorRedux} from 'react-redux';
+
+let refsCount = 0;
+
+const addRef = (selector) => {
+    if (!selector.refIds) {
+        selector.refIds = [];
+    }
+    selector.refIds.push(++refsCount);
+    return refsCount;
+};
+
+const removeRef = (selector, refId) => {
+    if (!selector.refIds) {
+        return;
+    }
+    selector.refIds = selector.refIds.filter((id) => id !== refId);
+    if (selector.refIds.length === 0) {
+        selector.clearCache();
+    }
+};
+
+/**
+ * Wrapper around useSelector that keeps reference count per component instance
+ *  in order to automatically clear the cache when all components using
+ *  the selector are unmounted.
+ *
+ * @param Function selector
+ * @param  {...any} args
+ */
+const useSelector = (selector, ...args) => {
+    const ref = useRef();
+
+    if (!ref.current) {
+        ref.current = addRef(selector);
+    }
+
+    useEffect(() => {
+        const refId = ref.current;
+        return () => removeRef(selector, refId);
+    }, [selector]);
+
+    const result = useSelectorRedux((state) => {
+        // setState(state);
+        // selector.withState = function (state) {
+        //   context.state = state;
+        //   return proxy;
+        // }
+        return selector.withState(state).apply(null, args);
+    });
+
+    return result;
+};
 
 const createNoopStorage = () => {
     return {
@@ -80,50 +143,79 @@ const isObject = (variable) => {
 const isString = (variable) =>
     typeof variable === 'string' || variable instanceof String;
 
-var getByPath = function (obj, path, def) {
-    /**
-     * If the path is a string, convert it to an array
-     * @param  {String|Array} path The path
-     * @return {Array}             The path array
-     */
-    var stringToPath = function (path) {
-        // If the path isn't a string, return it
-        if (typeof path !== 'string') return path;
+const getParsedPath = (path) => (Array.isArray(path) ? path : parse(path));
 
-        // Create new array
-        var output = [];
+const getCoalescedValue = (value, fallbackValue) =>
+    value === void 0 ? fallbackValue : value;
 
-        // Split to an array with dot notation
-        path.split('.').forEach(function (item, index) {
-            // Split to an array with bracket notation
-            item.split(/\[([^}]+)\]/g).forEach(function (key) {
-                // Push to the new array
-                if (key.length > 0) {
-                    output.push(key);
-                }
-            });
-        });
+const getByPath = (object, path, noMatchValue) => {
+    const parsedPath = getParsedPath(path);
 
-        return output;
-    };
-
-    // Get the path as an array
-    path = stringToPath(path);
-
-    // Cache the current object
-    var current = obj;
-
-    // For each item in the path, dig into the object
-    for (var i = 0; i < path.length; i++) {
-        // If the item isn't found, return the default (or null)
-        if (!current[path[i]]) return def;
-
-        // Otherwise, update the current  value
-        current = current[path[i]];
+    if (parsedPath.length === 1) {
+        return object
+            ? getCoalescedValue(object[parsedPath[0]], noMatchValue)
+            : noMatchValue;
     }
 
-    return current;
+    let ref = object;
+    let key = parsedPath[0];
+
+    for (let index = 0; index < parsedPath.length - 1; index++) {
+        if (!ref || !ref[key]) {
+            return noMatchValue;
+        }
+
+        ref = ref[key];
+        key = parsedPath[index + 1];
+    }
+
+    return ref ? getCoalescedValue(ref[key], noMatchValue) : noMatchValue;
 };
+
+// var getByPath = function (obj, path, def) {
+//     /**
+//      * If the path is a string, convert it to an array
+//      * @param  {String|Array} path The path
+//      * @return {Array}             The path array
+//      */
+//     var stringToPath = function (path) {
+//         // If the path isn't a string, return it
+//         if (typeof path !== 'string') return path;
+
+//         // Create new array
+//         var output = [];
+
+//         // Split to an array with dot notation
+//         path.split('.').forEach(function (item, index) {
+//             // Split to an array with bracket notation
+//             item.split(/\[([^}]+)\]/g).forEach(function (key) {
+//                 // Push to the new array
+//                 if (key.length > 0) {
+//                     output.push(key);
+//                 }
+//             });
+//         });
+
+//         return output;
+//     };
+
+//     // Get the path as an array
+//     path = stringToPath(path);
+
+//     // Cache the current object
+//     var current = obj;
+
+//     // For each item in the path, dig into the object
+//     for (var i = 0; i < path.length; i++) {
+//         // If the item isn't found, return the default (or null)
+//         if (!current[path[i]]) return def;
+
+//         // Otherwise, update the current  value
+//         current = current[path[i]];
+//     }
+
+//     return current;
+// };
 const fakeFunc = () => undefined;
 
 const reducerFunc = z.function(z.tuple([z.unknown(), z.unknown()]), z.void());
@@ -245,7 +337,7 @@ const processReducer = ({
         // }
     });
     const c = Object.assign({}, ...newReducers);
-    console.log(c);
+    // console.log(c);
     return c;
 };
 
@@ -493,6 +585,7 @@ function getSlicesFromExtraReducers({
     delete extraReducers.noPrefix;
     delete extraReducers.reducers;
     delete extraReducers.selectors;
+    delete extraReducers.getters;
 
     const modulesInitialState = Object.values(MODULES)
         .map((module) => module?.state ?? {})
@@ -548,12 +641,15 @@ export const prf = {
             state.status = 'succeeded';
         },
     },
+    getters: {
+        getStatus: ({state}) => state?.status,
+        getError: ({state}) => state?.error,
+    },
     selectors: {
-        getError: (state, selectors) =>
-            (selectors?.getStatus(state) === 'failed' && state?.error) || '',
-        getStatus: (state) => state?.status,
-        isStatusFinish: (state, selectors) =>
-            ['rejected', 'succeeded'].includes(selectors.getStatus(state)),
+        getError: ({getters}) =>
+            (getters?.getStatus() === 'failed' && getters?.getError()) || '',
+        isStatusFinish: ({getters, selectors}) =>
+            ['rejected', 'succeeded'].includes(getters.getStatus()),
     },
 }; // pending, reject, fulfilled
 
@@ -562,6 +658,8 @@ export const INITIAL_STATE = {};
 export const DEFAULT_CASES = {};
 
 export const DEFAULT_SELECTORS = {};
+
+export const DEFAULT_GETTERS = {};
 
 const configure = ({modules = {prf}} = {}) => {
     if (MODULES_CONFIGURATED) return;
@@ -835,50 +933,166 @@ function combineReducersListOrObject({
     };
 }
 
-export const createSelectors = (
+export const createGetters = (
     slice,
     name,
-    defaultSelectors = DEFAULT_SELECTORS,
+    defaultGetters = DEFAULT_GETTERS,
 ) => {
+    const sliceObj = getSlicesObj({slice});
+    const {getters = {}} = sliceObj;
+    const modulesDefaultGetters = Object.values(MODULES)
+        .map((module) => module?.getters ?? {})
+        .reduce((state1, state2) => ({...state1, ...state2}), {});
+
+    const gettersAll = flatArrayOfObject(
+        {},
+        Object.entries({
+            ...modulesDefaultGetters,
+            ...defaultGetters,
+            ...getters,
+        }).map(([k, v]) => {
+            if (isFunction(v)) {
+                return {
+                    [k]: (...args) =>
+                        createObserver((state) =>
+                            v({
+                                state: state[name],
+                                getters: {
+                                    ...modulesDefaultGetters,
+                                    ...defaultGetters,
+                                    ...getters,
+                                },
+                                args: args?.[0] ?? {},
+                                context: {
+                                    state,
+                                    name,
+                                },
+                            }),
+                        )(),
+                };
+            }
+            if (isString(v)) {
+                return {
+                    [k]: (...args) =>
+                        createObserver(({state}) =>
+                            getByPath(state[name], v, undefined),
+                        ),
+                };
+            }
+        }),
+    );
+
+    return gettersAll;
+};
+
+// export const createGetters = () => {
+
+// }
+
+export const createSelectors = ({
+    slice,
+    name,
+    getters = {},
+    defaultSelectors = DEFAULT_SELECTORS,
+}) => {
     const sliceObj = getSlicesObj({slice});
     const {selectors = {}} = sliceObj;
     const modulesDefaultSelectors = Object.values(MODULES)
         .map((module) => module?.selectors ?? {})
         .reduce((state1, state2) => ({...state1, ...state2}), {});
-    return flatArrayOfObject(
-        // TODO: REWORK selectors send to function
+
+    const selectorsAll = flatArrayOfObject(
         {},
         Object.entries({
             ...modulesDefaultSelectors,
             ...defaultSelectors,
             ...selectors,
+            ...getters,
         }).map(([k, v]) => {
             if (isFunction(v)) {
                 return {
-                    [k]: () =>
-                        useSelector((state) =>
-                            v(
-                                state[name],
-                                {
-                                    ...modulesDefaultSelectors,
-                                    ...defaultSelectors,
-                                    ...selectors,
-                                },
-                                {state, name},
-                            ),
+                    [k]: (...args) =>
+                        useSelector(
+                            createSelector(() => {
+                                return v({
+                                    getters,
+                                    args: args?.[0] ?? {},
+                                    context: {
+                                        name,
+                                    },
+                                });
+                            }),
                         ),
                 };
             }
-            if (isString(v)) {
-                return {
-                    [k]: (state) => {
-                        return getByPath(state[name], v, undefined);
-                    },
-                };
-            }
+            // if (isString(v)) {
+            //     return {
+            //         [k]: (...args) =>
+            //             useSelectorRedux((state) =>
+            //                 createSelector((state) =>
+            //                     getByPath(state[name], v, undefined),
+            //                 ),
+            //             ),
+            //     };
+            // }
         }),
     );
+
+    return selectorsAll;
 };
+
+// export const createSelectors = (
+//     slice,
+//     name,
+//     globalSelectors = {},
+//     defaultSelectors = DEFAULT_SELECTORS,
+// ) => {
+//     const sliceObj = getSlicesObj({slice});
+//     const {selectors = {}} = sliceObj;
+//     const modulesDefaultSelectors = Object.values(MODULES)
+//         .map((module) => module?.selectors ?? {})
+//         .reduce((state1, state2) => ({...state1, ...state2}), {});
+
+//     const selectorsAll = flatArrayOfObject(
+//         {},
+//         Object.entries({
+//             ...modulesDefaultSelectors,
+//             ...defaultSelectors,
+//             ...selectors,
+//         }).map(([k, v]) => {
+//             // if (isFunction(v)) {
+//             return {
+//                 [k]: (...args) =>
+//                     createSelector(({state}) =>
+//                         v({
+//                             state: state[name],
+//                             selectors: {
+//                                 ...modulesDefaultSelectors,
+//                                 ...defaultSelectors,
+//                                 ...selectors,
+//                             },
+//                             args: args?.[0] ?? {},
+//                             context: {
+//                                 state,
+//                                 name,
+//                                 globalSelectors: selectors,
+//                             },
+//                         }),
+//                     ),
+//             };
+//             // }
+//             // if (isString(v)) {
+//             //     return {
+//             //         [k]: (...args) =>
+//             //             createObserver(({state}) =>
+//             //                 getByPath(state[name], v, undefined),
+//             //             ),
+//             //     };
+//             // }
+//         }),
+//     );
+//     return selectorsAll;
+// };
 
 /*
   actions: function | {},
@@ -921,9 +1135,12 @@ const createActions = ({actions = {}, slice} = {}) => {
 };
 
 export const createActionsSelectors = ({actions = {}, slice} = {}) => {
+    const getters = createGetters(slice, slice.name);
     return {
         actions: createActions({actions, slice}),
-        selectors: createSelectors(slice, slice.name),
+        selectors: createSelectors({slice, name: slice.name, getters}),
+        getters,
+        // selectors: createSelectorObservers(slice, slice.name),
     };
 };
 
@@ -970,6 +1187,7 @@ function createStorePersist({
     const store = configureStore({
         reducer: persistedReducer,
         middleware: getDefaultMiddleware({
+            immutableCheck: false,
             serializableCheck: {
                 ignoredActions: [
                     FLUSH,
