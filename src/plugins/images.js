@@ -7,12 +7,21 @@ import swipeIcon from '@/assets/img/SWIPE_ICONE.png';
 import listIcon from '@/assets/img/LISTE_ICONE.png';
 import searchIcon from '@/assets/img/RECHERCHER_ICONE.png';
 
+import ignorer from '@/assets/img/IGNORER.png';
+
+import ajouter from '@/assets/img/AJOUTER.png';
+
+import noter from '@/assets/img/NOTER.png';
+
 export const images = {
     movieEmoji,
     seriesEmoji,
     swipeIcon,
     listIcon,
     searchIcon,
+    ignorer,
+    ajouter,
+    noter,
 };
 
 // Convert image refs into image objects with Image.resolveAssetSource
