@@ -3,12 +3,12 @@ import React from 'react';
 import {TouchableOpacity, View} from 'react-native';
 import {useRestyle, spacing, border, backgroundColor} from '@shopify/restyle';
 import Text from './Text';
-import {createRestyleComponent, createVariant} from '@shopify/restyle';
+import {createVariant} from '@shopify/restyle';
 import {height, width} from '@/theme';
 
 export const Button = ({
     onPress,
-    label,
+    label = 'Button',
     children,
     style,
     textProps = {},
@@ -17,7 +17,7 @@ export const Button = ({
     const variant = createVariant({themeKey: 'buttonVariants'});
     const props = useRestyle(
         [variant, spacing, border, backgroundColor, height, width],
-        rest,
+        {...rest, style},
     );
     return (
         <TouchableOpacity onPress={onPress}>
@@ -32,7 +32,7 @@ export const Button = ({
 export const RoundedButton = ({onPress, label, children, radius, ...rest}) => {
     return (
         <Button
-            style={{borderRadius: radius}}
+            style={{borderRadius: radius, ...(rest?.style ?? {})}}
             {...{onPress, label, children, ...rest}}>
             {children}
         </Button>
