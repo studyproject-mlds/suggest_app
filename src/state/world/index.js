@@ -8,8 +8,8 @@ import {world} from './slice';
 
 // export const selectors = createSelectors(me);
 
-const {actions: createdActions, selectors} = createActionsSelectors({
-    slice: world,
+const {actions: createdActions, selectors, getters} = createActionsSelectors({
+	slice: world,
 });
 
-export {createdActions as actions, selectors, world};
+export {createdActions as actions, selectors, world, getters};

@@ -5,12 +5,13 @@ export const world = () => ({
             defaultWorldInProgress: null,
         },
     },
-    selectors: {
+    getters: {
         //     // getMe: 'me.data.me[0]', // prevent undefined path -> permit to choice default value here
-        getWorld: (state) => state?.data ?? {},
-        getDefaultWorldInProgress: (state, selectors) =>
-            selectors.getWorld(state)?.defaultWorldInProgress ?? null,
+        getWorld: ({state}) => state?.data ?? {},
+        getDefaultWorldInProgress: ({state, getters}) =>
+            getters.getWorld({state})?.defaultWorldInProgress ?? null,
     },
+    selectors: {},
 
     defaultWorld: {
         // TODO: subslicing thincking
